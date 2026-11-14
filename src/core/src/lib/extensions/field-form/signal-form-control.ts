@@ -3,6 +3,11 @@ import { AbstractControl, AsyncValidatorFn, FormControlState, ValidationErrors, 
 import { disabled, SchemaFn, validate, ValidationError } from '@angular/forms/signals';
 import { CompatValidationError, SignalFormControl } from '@angular/forms/signals/compat';
 
+interface ManualErrors {
+  errors: ValidationErrors | null;
+  value: unknown;
+}
+
 /**
  * `SignalFormControl` rejects the imperative `AbstractControl` API with NG01920.
  * This control forwards it to signals read by Signal Forms rules, so code written
@@ -12,21 +17,32 @@ export class FormlySignalFormControl extends SignalFormControl<unknown> {
   private readonly disabledState: WritableSignal<boolean>;
   // Validators are plain functions: bumping this signal re-runs the rule that calls them.
   private readonly revalidate: WritableSignal<number>;
+  // Errors set with setErrors(); they replace the validators until the next validation run, as on a FormControl.
+  private readonly manualErrors: WritableSignal<ManualErrors | undefined>;
 
   constructor(value: unknown, isDisabled: boolean, schema: SchemaFn<unknown>, injector?: Injector) {
     // `this` is not available before super(), so the rules close over locals.
     const disabledState = signal(isDisabled);
     const revalidate = signal(0);
+    const manualErrors = signal<ManualErrors | undefined>(undefined);
     const self: { control?: FormlySignalFormControl } = {};
     super(
       value,
       (p) => {
         disabled(p, { when: () => disabledState() });
-        validate(p, () => {
+        validate(p, ({ value }) => {
           revalidate();
-          const control = self.control;
+          const control: FormlySignalFormControl | undefined = self.control;
+          if (!control) {
+            return undefined;
+          }
 
-          return control ? toSignalErrors(control.validator?.(control) ?? null, control) : undefined;
+          const manual = manualErrors();
+          // A value change is a validation run: manual errors set for a previous value are stale.
+          const errors =
+            manual && Object.is(manual.value, value()) ? manual.errors : (control.validator?.(control) ?? null);
+
+          return toSignalErrors(errors, control);
         });
         schema(p);
       },
@@ -35,6 +51,7 @@ export class FormlySignalFormControl extends SignalFormControl<unknown> {
     self.control = this;
     this.disabledState = disabledState;
     this.revalidate = revalidate;
+    this.manualErrors = manualErrors;
   }
 
   override disable(): void {
@@ -57,7 +74,12 @@ export class FormlySignalFormControl extends SignalFormControl<unknown> {
     }
   }
 
+  override setErrors(errors: ValidationErrors | null): void {
+    this.manualErrors.set({ errors, value: this.value });
+  }
+
   override updateValueAndValidity(): void {
+    this.manualErrors.set(undefined);
     this.revalidate.update((count) => count + 1);
   }
 

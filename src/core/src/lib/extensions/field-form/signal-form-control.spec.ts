@@ -118,6 +118,43 @@ describe('FormlySignalFormControl', () => {
     });
   });
 
+  describe('setErrors()', () => {
+    it('should report the same errors as a FormControl', () => {
+      const control = createControl('foo');
+      const classic = new FormControl('foo');
+
+      control.setErrors({ server: { message: 'taken' } });
+      classic.setErrors({ server: { message: 'taken' } });
+
+      expect(control.errors).toEqual(classic.errors);
+      expect(control.status).toEqual('INVALID');
+
+      control.setErrors(null);
+      expect(control.errors).toBeNull();
+      expect(control.status).toEqual('VALID');
+    });
+
+    it('should replace the validator errors until the next validation run', () => {
+      const control = createControl(10);
+      control.setValidators(Validators.min(18));
+
+      control.setErrors({ server: true });
+      expect(control.errors).toEqual({ server: true });
+
+      control.updateValueAndValidity();
+      expect(control.errors).toEqual({ min: { min: 18, actual: 10 } });
+    });
+
+    it('should drop the errors when the value changes', () => {
+      const control = createControl('foo');
+      control.setErrors({ server: true });
+
+      control.setValue('bar');
+
+      expect(control.errors).toBeNull();
+    });
+  });
+
   describe('setAsyncValidators()', () => {
     it('should accept clearing and reject actual async validators', () => {
       const control = createControl('foo');

@@ -1,6 +1,6 @@
 import { JsonPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
-import { FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { AbstractControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { FormlyFieldConfig, FormlyForm, FormlyFormOptions } from '@ngx-formly/core';
 
 @Component({
@@ -11,7 +11,7 @@ import { FormlyFieldConfig, FormlyForm, FormlyFormOptions } from '@ngx-formly/co
 })
 export class AppComponent {
   form = new FormGroup({});
-  model = signal({ name: '', age: 25 });
+  model = signal({ name: '', age: 25, range: { start: 1, end: 5 } });
   summary = computed(() => `Hello ${this.model().name || '…'}`);
 
   isRequired = signal(true);
@@ -31,6 +31,22 @@ export class AppComponent {
       },
     },
     { key: 'age', type: 'input', props: { label: 'Age', type: 'number' } },
+    {
+      key: 'range',
+      // The group validator reports its error on the `end` control through setErrors().
+      validators: {
+        endAfterStart: {
+          expression: (c: AbstractControl): boolean => c.value.end > c.value.start,
+          message: 'End must be greater than start',
+          errorPath: 'end',
+        },
+      },
+      fieldGroupClassName: 'row',
+      fieldGroup: [
+        { key: 'start', type: 'input', className: 'col-6', props: { label: 'Start', type: 'number' } },
+        { key: 'end', type: 'input', className: 'col-6', props: { label: 'End', type: 'number' } },
+      ],
+    },
   ];
 
   toggleRequired(): void {

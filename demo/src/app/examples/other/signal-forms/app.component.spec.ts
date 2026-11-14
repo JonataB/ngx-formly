@@ -63,12 +63,12 @@ describe('Signal Forms example', () => {
     button('Disabled: off').click();
     await harness.fixture.whenStable();
     expect(nameInput().disabled).toBe(true);
-    expect(groupState().value).toEqual({ age: 25 });
+    expect(groupState().value).toEqual({ age: 25, range: { start: 1, end: 5 } });
 
     button('Disabled: on').click();
     await harness.fixture.whenStable();
     expect(nameInput().disabled).toBe(false);
-    expect(groupState().value).toEqual({ name: '', age: 25 });
+    expect(groupState().value).toEqual({ name: '', age: 25, range: { start: 1, end: 5 } });
   });
 
   it('hides the name field and clears its value with resetOnHide', async () => {
@@ -79,12 +79,33 @@ describe('Signal Forms example', () => {
 
     button('Hidden: off').click();
     await harness.fixture.whenStable();
-    expect(example.querySelectorAll('formly-form input').length).toBe(1);
-    expect(groupState().value).toEqual({ age: 25 });
+    expect(example.querySelectorAll('formly-form input').length).toBe(3);
+    expect(groupState().value).toEqual({ age: 25, range: { start: 1, end: 5 } });
     expect(example.textContent).toContain('Hello …');
 
     button('Hidden: on').click();
     await harness.fixture.whenStable();
-    expect(example.querySelectorAll('formly-form input').length).toBe(2);
+    expect(example.querySelectorAll('formly-form input').length).toBe(4);
+  });
+
+  it('routes the range group validator error to the end field through errorPath', async () => {
+    const { harness, example, button, groupState } = await render();
+    button('Required: on').click();
+    await harness.fixture.whenStable();
+    expect(groupState().status).toBe('VALID');
+
+    const end: HTMLInputElement = example.querySelectorAll<HTMLInputElement>('formly-form input')[3];
+    end.value = '0';
+    end.dispatchEvent(new Event('input'));
+    end.dispatchEvent(new Event('blur'));
+    await harness.fixture.whenStable();
+    expect(groupState().status).toBe('INVALID');
+    expect(example.querySelector('formly-validation-message').textContent).toContain('End must be greater than start');
+
+    end.value = '9';
+    end.dispatchEvent(new Event('input'));
+    await harness.fixture.whenStable();
+    expect(groupState().status).toBe('VALID');
+    expect(example.querySelector('formly-validation-message')).toBeNull();
   });
 });

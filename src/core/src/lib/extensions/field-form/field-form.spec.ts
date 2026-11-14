@@ -506,8 +506,7 @@ describe('FieldFormExtension', () => {
       expect(city.disabled).toBe(false);
     });
 
-    // Pending for signalForms: not forwarded yet.
-    it.skipIf(signalForms)('should route a group validator error to a child through errorPath', () => {
+    it('should route a group validator error to a child through errorPath', () => {
       const field = build(
         {
           key: 'range',
