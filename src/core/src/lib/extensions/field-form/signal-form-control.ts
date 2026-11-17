@@ -1,11 +1,15 @@
 import { Injector, linkedSignal, signal, untracked, WritableSignal } from '@angular/core';
+import { getActiveConsumer } from '@angular/core/primitives/signals';
 import {
   AbstractControl,
   AbstractControlOptions,
   AsyncValidatorFn,
+  ControlEvent,
   FormControlState,
   FormControlStatus,
   FormResetEvent,
+  PristineChangeEvent,
+  TouchedChangeEvent,
   ValidationErrors,
   ValidatorFn,
 } from '@angular/forms';
@@ -39,6 +43,7 @@ export class FormlySignalFormControl extends SignalFormControl<unknown> {
   // Last status that statusChanges emitted, or that a call with `emitEvent: false` asked not to emit.
   private lastStatus?: string;
   private onlySelfStatus?: FormControlStatus;
+  private readonly interactionEffects = new WeakSet<object>();
 
   constructor(
     private readonly defaultValue: unknown,
@@ -76,6 +81,31 @@ export class FormlySignalFormControl extends SignalFormControl<unknown> {
     this.manualErrors = linkedSignal({ source: this.sourceValue, computation: (): undefined => undefined });
     self.control = this;
 
+    // shortcut: Angular's interaction effects clear siblings; remove when they aggregate parent state instead.
+    const control = this as unknown as { emitControlEvent(event: ControlEvent<unknown>): void };
+    const emitControlEvent = control.emitControlEvent.bind(this);
+    control.emitControlEvent = (event) => {
+      const consumer = getActiveConsumer();
+      const interaction = event instanceof PristineChangeEvent || event instanceof TouchedChangeEvent;
+      if (consumer && interaction) {
+        this.interactionEffects.add(consumer);
+      }
+      emitControlEvent(event);
+      if (consumer && interaction) {
+        const parent = super.parent as AbstractControl['parent'] & {
+          _updatePristine(options: EventOptions, source: AbstractControl): void;
+          _updateTouched(options: EventOptions, source: AbstractControl): void;
+        };
+        untracked(() => {
+          if (event instanceof PristineChangeEvent) {
+            parent?._updatePristine({}, this);
+          } else {
+            parent?._updateTouched({}, this);
+          }
+        });
+      }
+    };
+
     // SignalFormControl emits its status from an effect, after the call that asked for `emitEvent: false` returned.
     // The effect also runs again when the status was read between two writes that cancel out (a group validator
     // that clears and sets an error on this control), so an unchanged status is not emitted.
@@ -92,6 +122,12 @@ export class FormlySignalFormControl extends SignalFormControl<unknown> {
         emit(status);
       }
     };
+  }
+
+  override get parent(): AbstractControl['parent'] {
+    const consumer = getActiveConsumer();
+
+    return consumer && this.interactionEffects.has(consumer) ? null : super.parent;
   }
 
   // The forms directives read `updateOn` to decide when a typed value reaches the control.

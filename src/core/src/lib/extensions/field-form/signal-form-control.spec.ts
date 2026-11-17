@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { FormControl, FormGroup, FormResetEvent, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormArray, FormControl, FormGroup, FormResetEvent, ReactiveFormsModule, Validators } from '@angular/forms';
 import { FormlySignalFormControl } from './signal-form-control';
 
 function createControl(value: unknown, isDisabled = false): FormlySignalFormControl {
@@ -84,6 +84,85 @@ describe('FormlySignalFormControl', () => {
   });
 
   describe('reset()', () => {
+    it.each(['dirty', 'touched'] as const)('should preserve sibling %s state when resetting one child', (state) => {
+      const control = createControl('Alice');
+      const sibling = createControl('Bob');
+      const group = new FormGroup({ control, sibling });
+      const root = new FormGroup({ group });
+      TestBed.tick();
+      const mark = state === 'dirty' ? 'markAsDirty' : 'markAsTouched';
+      control[mark]();
+      sibling[mark]();
+      TestBed.tick();
+
+      control.reset('Alice');
+      TestBed.tick();
+
+      expect(control[state]).toBe(false);
+      expect(sibling[state]).toBe(true);
+      expect(group[state]).toBe(true);
+      expect(root[state]).toBe(true);
+
+      sibling.reset('Bob');
+      TestBed.tick();
+      expect(group[state]).toBe(false);
+      expect(root[state]).toBe(false);
+    });
+
+    it('should preserve a reactive sibling when resetting a signal control in an array', () => {
+      const control = createControl('Alice');
+      const sibling = new FormControl('Bob');
+      const array = new FormArray([control, sibling]);
+      TestBed.tick();
+      array.markAllAsTouched();
+      array.markAllAsDirty();
+      TestBed.tick();
+
+      control.reset();
+      TestBed.tick();
+
+      expect(control.pristine).toBe(true);
+      expect(control.untouched).toBe(true);
+      expect(sibling.dirty).toBe(true);
+      expect(sibling.touched).toBe(true);
+      expect(array.dirty).toBe(true);
+      expect(array.touched).toBe(true);
+
+      array.markAsPristine();
+      array.markAsUntouched();
+      TestBed.tick();
+      expect(sibling.pristine).toBe(true);
+      expect(sibling.untouched).toBe(true);
+      expect(array.pristine).toBe(true);
+      expect(array.untouched).toBe(true);
+    });
+
+    it('should preserve existing interaction state when another signal control is registered', () => {
+      const sibling = createControl('Alice');
+      const group = new FormGroup<{ [key: string]: FormlySignalFormControl }>({ sibling });
+      TestBed.tick();
+      sibling.markAsDirty();
+      sibling.markAsTouched();
+      TestBed.tick();
+
+      const control = createControl('Bob');
+      group.addControl('control', control);
+      TestBed.tick();
+
+      expect(control.parent).toBe(group);
+      expect(control.pristine).toBe(true);
+      expect(control.untouched).toBe(true);
+      expect(sibling.dirty).toBe(true);
+      expect(sibling.touched).toBe(true);
+      expect(group.dirty).toBe(true);
+      expect(group.touched).toBe(true);
+
+      group.reset();
+      TestBed.tick();
+      expect(group.pristine).toBe(true);
+      expect(group.untouched).toBe(true);
+    });
+
     it('should preserve reset events unless suppressed', () => {
       const control = createControl('Alice');
       const resets: FormResetEvent[] = [];
