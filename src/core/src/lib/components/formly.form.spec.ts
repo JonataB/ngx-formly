@@ -324,6 +324,29 @@ describe('FormlyForm Component', () => {
   describe('signalForms option (experimental)', () => {
     const signalForms = { extras: { signalForms: true } };
 
+    it('should refresh required metadata when fields reuse a signal control', () => {
+      const original: FormlyFieldConfig = { key: 'name', type: 'input', props: { required: false } };
+      const { form, setInputs } = renderComponent({ model: { name: '' }, fields: [original] }, signalForms);
+      const control = form.get('name') as SignalFormControl<string>;
+      expect(control.fieldTree().required()).toBe(false);
+
+      const replacement: FormlyFieldConfig = { key: 'name', type: 'input', props: { required: true } };
+      setInputs({ fields: [replacement] });
+      TestBed.tick();
+      expect(form.get('name')).toBe(control);
+      expect(control.errors).toEqual({ required: true });
+      expect(control.fieldTree().required()).toBe(true);
+
+      replacement.props.required = false;
+      TestBed.tick();
+      expect(control.errors).toBeNull();
+      expect(control.fieldTree().required()).toBe(false);
+
+      original.props.required = true;
+      TestBed.tick();
+      expect(control.fieldTree().required()).toBe(false);
+    });
+
     it('should write user edits to the signal model and emit modelChange', () => {
       const model = signal<any>({ name: 'foo' });
       const modelChange = vi.fn();

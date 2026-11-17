@@ -4,7 +4,7 @@ import { FormControl, FormGroup, FormResetEvent, ReactiveFormsModule, Validators
 import { FormlySignalFormControl } from './signal-form-control';
 
 function createControl(value: unknown, isDisabled = false): FormlySignalFormControl {
-  return TestBed.runInInjectionContext(() => new FormlySignalFormControl(value, isDisabled, () => {}));
+  return TestBed.runInInjectionContext(() => new FormlySignalFormControl(value, isDisabled));
 }
 
 describe('FormlySignalFormControl', () => {
@@ -237,7 +237,7 @@ describe('FormlySignalFormControl', () => {
         imports: [ReactiveFormsModule],
       })
       class HostComponent {
-        control = new FormlySignalFormControl('Alice', false, () => {}, undefined, updateOn);
+        control = new FormlySignalFormControl('Alice', false, undefined, updateOn);
         form = new FormGroup({ name: this.control });
       }
       const fixture = TestBed.createComponent(HostComponent);

@@ -9,9 +9,10 @@ import {
   ValidationErrors,
   ValidatorFn,
 } from '@angular/forms';
-import { disabled, SchemaFn, validate, ValidationError } from '@angular/forms/signals';
+import { disabled, metadata, REQUIRED, validate, ValidationError } from '@angular/forms/signals';
 import { CompatValidationError, SignalFormControl } from '@angular/forms/signals/compat';
 import { Subject } from 'rxjs';
+import { FormlyFieldConfigCache } from '../../models';
 
 type UpdateOn = NonNullable<AbstractControlOptions['updateOn']>;
 type EventOptions = { onlySelf?: boolean; emitEvent?: boolean };
@@ -43,7 +44,6 @@ export class FormlySignalFormControl extends SignalFormControl<unknown> {
   constructor(
     private readonly defaultValue: unknown,
     isDisabled: boolean,
-    schema: SchemaFn<unknown>,
     injector?: Injector,
     private readonly updateStrategy?: UpdateOn,
   ) {
@@ -67,7 +67,12 @@ export class FormlySignalFormControl extends SignalFormControl<unknown> {
 
           return toSignalErrors(errors, control);
         });
-        schema(p);
+        metadata(p, REQUIRED, () => {
+          revalidate();
+          const control = self.control as FormlyFieldConfigCache['formControl'];
+
+          return !!control?._fields?.some((field) => !field._hide && field.props.required);
+        });
       },
       { injector },
     );
