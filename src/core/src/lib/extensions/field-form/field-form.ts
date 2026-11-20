@@ -9,9 +9,7 @@ import {
   FormControl,
   AbstractControl,
 } from '@angular/forms';
-import { signal } from '@angular/core';
-import { metadata, REQUIRED } from '@angular/forms/signals';
-import { getFieldValue, defineHiddenProp, hasKey, getKeyPath, observe } from '../../utils';
+import { getFieldValue, defineHiddenProp, hasKey, getKeyPath } from '../../utils';
 import { registerControl, findControl, updateValidity, isSignalFormControl, acceptsImperativeApi } from './utils';
 import { FormlySignalFormControl } from './signal-form-control';
 import { of } from 'rxjs';
@@ -88,14 +86,9 @@ export class FieldFormExtension implements FormlyExtension {
   }
 
   private createSignalFormControl(field: FormlyFieldConfigCache): AbstractControl {
-    // Validation runs through Formly's validators; this only exposes `required()` on the field tree.
-    const isRequired = signal(!!field.props.required);
-    observe(field, ['props', 'required'], ({ currentValue }) => isRequired.set(!!currentValue));
-
     return new FormlySignalFormControl(
       getFieldValue(field),
       !!field.props.disabled,
-      (p) => metadata(p, REQUIRED, () => isRequired()),
       field.options._injector,
       field.modelOptions.updateOn,
     );
